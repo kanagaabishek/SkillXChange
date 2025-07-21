@@ -4,9 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
-import { User, Award, Clock, CheckCircle, Copy, ExternalLink, Star } from 'lucide-react';
+import {
+  User, Award, Clock, CheckCircle, Copy, ExternalLink, Star, BookOpen,
+} from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 import { useToast } from '@/hooks/use-toast';
+import axios from 'axios';
 
 interface UserProfile {
   name: string;
@@ -33,15 +36,29 @@ interface ActiveSession {
   progress: number;
 }
 
+// ---- This interface should match your backend Course entity structure ----
+interface Course {
+  id: number | string;
+  title: string;
+  category: string;
+  level: string;
+  type: string;
+  location: string;
+  description: string;
+  // Add other relevant fields as needed!
+}
+
 const Profile = () => {
   const { account, isConnected, connectWallet, balance } = useWallet();
   const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [myCourses, setMyCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coursesLoading, setCoursesLoading] = useState(false);
 
-  // Mock data for demonstration
+  // Mock data for demonstration (still used for other profile info)
   const mockProfile: UserProfile = {
     name: 'Alex Developer',
     reputation: 4.8,
@@ -93,30 +110,45 @@ const Profile = () => {
     }
   ];
 
+  // Fetch owned courses on wallet connect
   useEffect(() => {
-    if (isConnected) {
-      const fetchProfile = async () => {
-        setLoading(true);
+    const fetchProfileAndCourses = async () => {
+      setLoading(true);
+      if (isConnected && account) {
         try {
-          // In a real app, this would fetch from the API
-          // const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/${account}`);
-          
-          // Mock delay for demonstration
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          setProfile(mockProfile);
-          setCompletedSessions(mockCompletedSessions);
-          setActiveSessions(mockActiveSessions);
+          // Fetch courses for this wallet address
+          setCoursesLoading(true);
+          const coursesResp = await axios.get(
+            `http://localhost:8080/api/courses/owner/${account}`
+          );
+          setMyCourses(
+            Array.isArray(coursesResp.data) ? coursesResp.data : []
+          );
         } catch (error) {
-          console.error('Failed to fetch profile:', error);
+          toast({
+            title: "Error",
+            description: "Could not load your courses.",
+            variant: "destructive"
+          });
+          setMyCourses([]);
         } finally {
-          setLoading(false);
+          setCoursesLoading(false);
         }
-      };
 
-      fetchProfile();
-    } else {
-      setLoading(false);
-    }
+        // Mock profile/activity data (replace with your real API)
+        // const response = await axios.get(`.../api/profile/${account}`)
+        await new Promise(resolve => setTimeout(resolve, 600)); // Simulate API delay
+        setProfile(mockProfile);
+        setCompletedSessions(mockCompletedSessions);
+        setActiveSessions(mockActiveSessions);
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileAndCourses();
+    // Only refetch if account changes or connect state changes
   }, [isConnected, account]);
 
   const copyToClipboard = (text: string) => {
@@ -131,11 +163,9 @@ const Profile = () => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  // Generate dynamic SVG NFT badge
   const generateNFTBadge = (reputation: number) => {
     const badgeColor = reputation >= 4.5 ? '#10B981' : reputation >= 4.0 ? '#F59E0B' : '#EF4444';
     const badgeText = reputation >= 4.5 ? 'EXPERT' : reputation >= 4.0 ? 'SKILLED' : 'LEARNER';
-    
     return (
       <div className="relative w-24 h-24 mx-auto">
         <svg width="96" height="96" viewBox="0 0 96 96" className="drop-shadow-lg">
@@ -179,7 +209,6 @@ const Profile = () => {
             </nav>
           </div>
         </header>
-
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-2xl mx-auto text-center">
             <Card className="card-shadow">
@@ -246,7 +275,6 @@ const Profile = () => {
                 <div className="flex-shrink-0">
                   {profile && generateNFTBadge(profile.reputation)}
                 </div>
-                
                 <div className="flex-1 text-center md:text-left">
                   <h1 className="text-2xl font-bold mb-2">{profile?.name}</h1>
                   <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
@@ -259,13 +287,12 @@ const Profile = () => {
                       {profile?.nftCount} NFTs Earned
                     </Badge>
                   </div>
-                  
                   <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
                     <code className="bg-muted px-2 py-1 rounded text-sm">
                       {account && formatAddress(account)}
                     </code>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => account && copyToClipboard(account)}
                     >
@@ -275,7 +302,6 @@ const Profile = () => {
                       <ExternalLink className="w-3 h-3" />
                     </Button>
                   </div>
-                  
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Balance</p>
@@ -295,13 +321,66 @@ const Profile = () => {
             </CardContent>
           </Card>
 
+          {/* MY COURSES SECTION */}
+          <Card className="mb-8 card-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen />
+                Your Courses
+              </CardTitle>
+              <CardDescription>
+                Here are the courses that you are currently hosting as a teacher or offering to others.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {coursesLoading ? (
+                <div className="text-center py-4">Loading your courses...</div>
+              ) : myCourses.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="mb-2 text-muted-foreground">You are not hosting any courses yet.</p>
+                  <Link to="/post">
+                    <Button className="web3-button">
+                      Post a Skill
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {myCourses.map(course => (
+                    <Card key={course.id} className="mb-2 skill-card">
+                      <CardHeader>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">{course.category}</Badge>
+                            <Badge variant="outline">{course.level}</Badge>
+                            <Badge variant="outline">{course.type}</Badge>
+                            <Badge variant="outline">{course.location}</Badge>
+                          </div>
+                          <CardTitle>{course.title}</CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-muted-foreground mb-2 text-sm line-clamp-3">{course.description}</p>
+                        <Link to={`/courses/${course.id}`}>
+                          <Button size="sm" variant="outline" className="w-full">
+                            View Course
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Activity Tabs */}
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="active">Active Sessions</TabsTrigger>
               <TabsTrigger value="completed">Completed Sessions</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="active" className="space-y-4">
               {activeSessions.length === 0 ? (
                 <Card>
@@ -352,7 +431,6 @@ const Profile = () => {
                             />
                           </div>
                         </div>
-                        
                         <Link to={`/session/${session.id}`}>
                           <Button className="w-full" variant="outline">
                             View Session
@@ -364,7 +442,7 @@ const Profile = () => {
                 ))
               )}
             </TabsContent>
-            
+
             <TabsContent value="completed" className="space-y-4">
               {completedSessions.length === 0 ? (
                 <Card>

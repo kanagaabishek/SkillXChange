@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Clock, Users, MessageCircle, Award } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Users, MessageCircle, Award, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWallet } from '@/contexts/WalletContext';
 
@@ -37,6 +37,12 @@ interface SessionDetail {
   contractAddress: string;
   createdAt: string;
   completedAt?: string;
+  zoomLink: string;
+  fee?: number | null;
+}
+
+declare global {
+  interface Window { ethereum?: any; }
 }
 
 const SessionDetail = () => {
@@ -46,6 +52,10 @@ const SessionDetail = () => {
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
+
+  // Join/payment state
+  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   // Mock session data for demonstration
   const mockSession: SessionDetail = {
@@ -92,18 +102,18 @@ const SessionDetail = () => {
       userBCompleted: false
     },
     contractAddress: '0x1234567890123456789012345678901234567890',
-    createdAt: '2024-01-15T10:00:00Z'
+    createdAt: '2024-01-15T10:00:00Z',
+    fee: 0.05, // Set to 0 or null for free session
+    zoomLink: 'https://us02web.zoom.us/j/1234567890?pwd=EXAMPLE'
   };
 
   useEffect(() => {
     const fetchSession = async () => {
       setLoading(true);
       try {
-        // In a real app, this would fetch from the API
-        // const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/sessions/${sessionId}`);
+        // In a real app, fetch data from API here
+        // const response = await axios.get(`/api/sessions/${sessionId}`);
         // setSession(response.data);
-        
-        // Mock delay for demonstration
         await new Promise(resolve => setTimeout(resolve, 1000));
         setSession(mockSession);
       } catch (error) {
@@ -117,9 +127,49 @@ const SessionDetail = () => {
         setLoading(false);
       }
     };
-
     fetchSession();
   }, [sessionId]);
+
+  // Payment handler
+  const handleJoinAndPay = async () => {
+    if (!session) return;
+    if (!window.ethereum) {
+      toast({ title: "MetaMask Required", description: "Install MetaMask to proceed.", variant: "destructive" });
+      return;
+    }
+    setPaying(true);
+    try {
+      const [userAddress] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      // fee in ETH, needs to be sent in Wei and hex
+      const feeEth = session.fee ?? 0;
+      const feeWei = (Number(feeEth) * 1e18).toString(16);
+
+      await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: userAddress,
+          to: session.skillA.user.wallet, // Send to session owner
+          value: feeWei
+        }]
+      });
+
+      setPaymentComplete(true);
+      toast({
+        title: "Payment Successful!",
+        description: "You have joined the session. The Zoom link is now available.",
+      });
+    } catch (e: any) {
+      toast({ title: "Payment Failed", description: e?.message || "Transaction rejected.", variant: "destructive" });
+    }
+    setPaying(false);
+  };
+
+  const handleCopyZoom = () => {
+    if (session?.zoomLink) {
+      navigator.clipboard.writeText(session.zoomLink);
+      toast({ title: "Copied", description: "Zoom link copied!" });
+    }
+  };
 
   const handleConfirmCompletion = async () => {
     if (!isConnected || !session) {
@@ -130,19 +180,13 @@ const SessionDetail = () => {
       });
       return;
     }
-
     setConfirming(true);
     try {
-      // In a real app, this would call the smart contract
-      // const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/sessions/${sessionId}/complete`, {
-      //   userWallet: account
-      // });
-
+      // In a real app, call smart contract/api to confirm
       toast({
         title: "Completion Confirmed!",
         description: "Your completion has been recorded on the blockchain.",
       });
-
       // Update local state
       setSession(prev => prev ? {
         ...prev,
@@ -152,7 +196,6 @@ const SessionDetail = () => {
           userBCompleted: account === session.skillB.user.wallet ? true : prev.progress.userBCompleted
         }
       } : null);
-
     } catch (error) {
       console.error('Failed to confirm completion:', error);
       toast({
@@ -186,6 +229,8 @@ const SessionDetail = () => {
   const isSessionComplete = () => {
     return session?.progress.userACompleted && session?.progress.userBCompleted;
   };
+
+  const showZoomDirectly = () => !session?.fee || Number(session.fee) === 0;
 
   if (loading) {
     return (
@@ -281,7 +326,6 @@ const SessionDetail = () => {
                     </span>
                   </div>
                 </div>
-                
                 <div className="space-y-2">
                   <h3 className="font-semibold text-accent">{session.skillB.title}</h3>
                   <p className="text-sm text-muted-foreground">
@@ -299,7 +343,6 @@ const SessionDetail = () => {
                   </div>
                 </div>
               </div>
-              
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Overall Progress</span>
@@ -311,6 +354,59 @@ const SessionDetail = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Payment & Zoom link */}
+          {isUserParticipant() && !isSessionComplete() && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Access Live Session</CardTitle>
+                <CardDescription>
+                  Join the session by paying the required fee (if any). After payment, the Zoom link will be shown.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {showZoomDirectly() || paymentComplete ? (
+                  <>
+                    <div className="mb-2">
+                      <span className="font-semibold">Zoom Link:</span>{' '}
+                      <span className="bg-muted px-2 py-1 rounded">{session.zoomLink}</span>
+                      <Button
+                        size="sm"
+                        className="ml-2"
+                        variant="outline"
+                        onClick={handleCopyZoom}
+                      >
+                        <Copy className="w-4 h-4" /> Copy
+                      </Button>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Copy and store the Zoom link safely!
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <span className="font-semibold">Fee:</span>{' '}
+                      {session.fee ? (
+                        <>
+                          <Badge className="bg-blue-100 text-blue-800">{session.fee} ETH</Badge>
+                        </>
+                      ) : (
+                        <Badge className="bg-green-100 text-green-800">Free</Badge>
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleJoinAndPay}
+                      className="web3-button"
+                      disabled={paying}
+                    >
+                      {paying ? "Processing..." : `Join & Pay`}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* AI-Generated Session Outline */}
           <Card className="mb-6">
@@ -332,7 +428,6 @@ const SessionDetail = () => {
                   ))}
                 </ul>
               </div>
-
               <div>
                 <h3 className="font-semibold mb-3">Timeline</h3>
                 <ul className="space-y-2">
@@ -344,7 +439,6 @@ const SessionDetail = () => {
                   ))}
                 </ul>
               </div>
-
               <div>
                 <h3 className="font-semibold mb-3">Expected Deliverables</h3>
                 <ul className="space-y-2">

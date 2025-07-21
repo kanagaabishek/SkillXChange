@@ -6,43 +6,43 @@ import { ArrowRight, Users, Bot, Shield, Award } from 'lucide-react';
 import { useWallet } from '@/contexts/WalletContext';
 
 const Landing = () => {
-  const { connectWallet, isConnected } = useWallet();
+  const { connectWallet, isConnected, disconnectWallet, account } = useWallet();
 
   const steps = [
     {
       icon: <Users className="w-6 h-6" />,
       title: "Post",
-      description: "Share your skill or what you want to learn"
+      description: "Share your skill or request what you'd like to learn."
     },
     {
       icon: <Bot className="w-6 h-6" />,
       title: "Match",
-      description: "AI finds perfect skill exchange partners"
+      description: "Let our AI match you with ideal exchange partners."
     },
     {
       icon: <Shield className="w-6 h-6" />,
       title: "Barter",
-      description: "Secure skill exchange with smart contracts"
+      description: "Trade knowledge securely, powered by smart contracts."
     },
     {
       icon: <Award className="w-6 h-6" />,
       title: "Earn NFT",
-      description: "Get reputation NFTs for completed exchanges"
+      description: "Build your blockchain reputation with verified NFTs."
     }
   ];
 
   const features = [
     {
       title: "AI Matchmaking",
-      description: "Smart AI finds the perfect skill exchange matches based on your needs and expertise."
+      description: "AI matches you with the best peers to teach or learn together, saving you time and boosting results."
     },
     {
-      title: "Blockchain Reputation",
-      description: "Build trust with immutable reputation NFTs that showcase your successful exchanges."
+      title: "On-Chain Reputation",
+      description: "Show off your completed skill barters and build trust with unique, unforgeable reputation NFTs."
     },
     {
-      title: "Free Mentoring",
-      description: "Access free mentoring and skill sharing from the community without any fees."
+      title: "Peer-to-Peer & Free",
+      description: "No fees. No middlemen. Just real peer-to-peer learning and mentoring for everyone in the community."
     }
   ];
 
@@ -68,13 +68,20 @@ const Landing = () => {
               Profile
             </Link>
           </nav>
-          <Button 
-            onClick={connectWallet}
-            className="connect-wallet-btn"
-            disabled={isConnected}
-          >
-            {isConnected ? 'Connected' : 'Connect Wallet'}
-          </Button>
+          {isConnected ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                {account ? account.slice(0, 6) + '...' + account.slice(-4) : ''}
+              </span>
+              <Button onClick={disconnectWallet} variant="outline" className="connect-wallet-btn text-black bg-red-500">
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={connectWallet} className="connect-wallet-btn">
+              Connect Wallet
+            </Button>
+          )}
         </div>
       </header>
 
@@ -85,12 +92,12 @@ const Landing = () => {
             SkillXchange
           </h1>
           <p className="text-xl md:text-2xl mb-8 text-muted-foreground max-w-2xl mx-auto">
-            Trade Skills. No Cash. Build Trust.
+            The Web3 bartering app where students and developers trade skills, not cash.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/explore">
               <Button size="lg" className="web3-button">
-                Explore Skills
+                Explore Star Skills
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
@@ -106,10 +113,10 @@ const Landing = () => {
       {/* How It Works */}
       <section className="py-16 px-4 bg-muted/50">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">How SkillXchange Works</h2>
           <div className="grid md:grid-cols-4 gap-8">
-            {steps.map((step, index) => (
-              <Card key={index} className="text-center skill-card">
+            {steps.map((step, idx) => (
+              <Card key={idx} className="text-center skill-card">
                 <CardHeader>
                   <div className="w-12 h-12 web3-gradient rounded-full flex items-center justify-center mx-auto mb-4">
                     {step.icon}
@@ -128,16 +135,16 @@ const Landing = () => {
       {/* Features */}
       <section className="py-16 px-4">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Why Choose SkillXchange?</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">Why SkillXchange?</h2>
           <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="skill-card">
+            {features.map((feature, idx) => (
+              <Card key={idx} className="skill-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <div className="w-8 h-8 web3-gradient rounded-lg flex items-center justify-center">
-                      {index === 0 && <Bot className="w-4 h-4 text-white" />}
-                      {index === 1 && <Shield className="w-4 h-4 text-white" />}
-                      {index === 2 && <Award className="w-4 h-4 text-white" />}
+                      {idx === 0 && <Bot className="w-4 h-4 text-white" />}
+                      {idx === 1 && <Shield className="w-4 h-4 text-white" />}
+                      {idx === 2 && <Award className="w-4 h-4 text-white" />}
                     </div>
                     {feature.title}
                   </CardTitle>
@@ -154,7 +161,7 @@ const Landing = () => {
       {/* Footer */}
       <footer className="border-t py-8 px-4 bg-muted/30">
         <div className="container mx-auto text-center text-muted-foreground">
-          <p>&copy; 2024 SkillXchange. Built with Web3 for the community.</p>
+          <p>&copy; 2024 SkillXchange. Built for students and devs, powered by smart contracts.</p>
         </div>
       </footer>
     </div>
